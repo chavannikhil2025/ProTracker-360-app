@@ -429,9 +429,8 @@
           }, [availableColumns]);
 
           const tableColumns = useMemo(() => {
-            const baseColumns = ['Client', 'Location', 'Status', 'State'];
-            const additionalColumns = availableColumns.filter(c => !baseColumns.includes(c));
-            return [...baseColumns, ...additionalColumns];
+            // Return columns in the exact order they appear in COLUMN_DEFS
+            return KNOWN_COLUMNS.filter(col => availableColumns.includes(col));
           }, [availableColumns]);
 
           // Initialize default column widths
@@ -439,14 +438,31 @@
             if (tableColumns.length > 0 && Object.keys(columnWidths).length === 0) {
               const defaultWidths = {};
               tableColumns.forEach(col => {
-                defaultWidths[col] = 150; // Default width in pixels
+                // Set wider default widths for better visibility
+                if (col === 'Client' || col === 'Location' || col === 'Address') {
+                  defaultWidths[col] = 200;
+                } else if (col === 'Status' || col === 'Contact Person') {
+                  defaultWidths[col] = 180;
+                } else if (col.includes('Date') || col === 'Callout') {
+                  defaultWidths[col] = 130;
+                } else if (col.includes('No') || col === 'State' || col === 'Sign Type') {
+                  defaultWidths[col] = 120;
+                } else {
+                  defaultWidths[col] = 150;
+                }
               });
               setColumnWidths(defaultWidths);
             }
           }, [tableColumns]);
 
           const getColumnWidth = (column) => {
-            return columnWidths[column] || 150;
+            if (columnWidths[column]) return columnWidths[column];
+            // Fallback defaults
+            if (column === 'Client' || column === 'Location' || column === 'Address') return 200;
+            if (column === 'Status' || column === 'Contact Person') return 180;
+            if (column.includes('Date') || column === 'Callout') return 130;
+            if (column.includes('No') || column === 'State' || column === 'Sign Type') return 120;
+            return 150;
           };
 
           // Get unique client list for filter
@@ -805,7 +821,7 @@
                 </div>
               </nav>
 
-              <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-6">
+              <main className={`flex-1 w-full px-6 py-6 ${activeView === 'data' ? 'max-w-none' : 'max-w-7xl mx-auto'}`}>
                 {activeView === 'dashboard' ? (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -1010,7 +1026,7 @@
                                     key={col}
                                     style={{ width: `${getColumnWidth(col)}px` }}
                                     className={`px-4 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider relative ${
-                                      index === 0 ? 'sticky left-0 bg-gradient-to-r from-slate-100 to-slate-50 z-10 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.15)]' : ''
+                                      col === 'Sr No' ? 'sticky left-0 bg-gradient-to-r from-slate-100 to-slate-50 z-10 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.15)]' : ''
                                     }`}
                                   >
                                     <div 
@@ -1050,7 +1066,7 @@
                                         key={col}
                                         style={{ width: `${getColumnWidth(col)}px` }}
                                         className={`px-4 py-4 text-slate-600 text-sm ${
-                                          index === 0 ? 'sticky left-0 bg-inherit group-hover:bg-blue-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] font-semibold text-slate-900' : ''
+                                          col === 'Sr No' ? 'sticky left-0 bg-inherit group-hover:bg-blue-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] font-semibold text-slate-900' : ''
                                         }`}
                                       >
                                         {col === 'Status' ? (
