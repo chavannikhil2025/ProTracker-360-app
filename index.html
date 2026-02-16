@@ -286,6 +286,9 @@
                 }
 
                 const headers = Object.keys(jsonData[0]);
+                console.log('Excel Headers Found:', headers);
+                console.log('Expected KNOWN_COLUMNS:', KNOWN_COLUMNS);
+                
                 const rows = jsonData.map(row => {
                   const cleanRow = {};
                   headers.forEach(h => {
@@ -463,11 +466,10 @@
           }, [rawData]);
 
           const availableColumns = useMemo(() => {
-            if (rawData.length === 0) return KNOWN_COLUMNS;
-            const cols = new Set();
-            rawData.forEach(row => Object.keys(row).forEach(k => cols.add(k)));
-            return [...cols].filter(c => c !== '_id');
-          }, [rawData]);
+            // Always return ALL known columns, even if not in current data
+            // This ensures all fields show in the form even with missing columns in Excel
+            return KNOWN_COLUMNS;
+          }, []);
 
           const dynamicFieldGroups = useMemo(() => {
             const groups = {};
