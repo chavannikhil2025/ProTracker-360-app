@@ -167,14 +167,13 @@
           'Remarks': 'general'
         };
 
-        // CORRECTED FIELD GROUPS - State kept in Client Info, Survey By & Artwork Sent moved to Survey & Design
-        // PO Received moved to Approvals & PO, Invoice Submitted moved to Finance
+        // CORRECTED FIELD GROUPS - Per user's exact specification
         const FIELD_GROUPS_TEMPLATE = {
           'Client Info': ['Sr No', 'Client', 'Location', 'Callout', 'Status', 'State', 'Address', 'Contact Person', 'Contact No.'],
-          'Survey & Design': ['Sign Type', 'Survey By', 'Survey Date', 'Survey Shared', 'Signage Size', 'Artwork Sent', 'Artwork Approval'],
-          'Approvals & PO': ['Cost Shared', 'Cost Approval', 'PI No.', 'PI Date', 'PO Received', 'PO Number'],
-          'Production & Site': ['JC No', 'JC Date', 'Production Start', 'Production Finish', 'Dispatch Date', 'At Site', 'Work Start', 'Work Complete', 'Contractor', 'Completion Certificate', 'Photo', 'Warranty', 'AWB NO'],
-          'Finance': ['Invoice No', 'Invoice Date', 'Invoice Amt', 'Invoice Submitted', 'Payment Terms', 'Due Date', 'Payment received', 'Payment Balance', 'Aging', 'Remarks']
+          'Survey & Details': ['Sign Type', 'Survey By', 'Survey Date', 'Survey Shared', 'Signage Size', 'Artwork Sent', 'Artwork Approval'],
+          'Approval & PO': ['Cost Shared', 'Cost Approval', 'PI No.', 'PI Date', 'PO Received', 'PO Number'],
+          'Production & Site': ['JC No', 'JC Date', 'Production Start', 'Production Finish', 'Dispatch Date', 'At Site', 'Work Start', 'Work Complete', 'Contractor', 'Completion Certificate', 'Photo', 'Warranty'],
+          'Finance': ['Invoice No', 'Invoice Date', 'Invoice Amt', 'Invoice Submitted', 'Payment Terms', 'Due Date', 'Payment received', 'Payment Balance', 'AWB NO', 'Aging', 'Remarks']
         };
 
         const KNOWN_COLUMNS = Object.keys(COLUMN_DEFS);
@@ -193,6 +192,15 @@
           "Survey to be done",
           "Photo Awaited",
           "Paid"
+        ];
+
+        const CLIENT_OPTIONS = [
+          "Aditya Birla Fashion and Retail and Retail Limited (Pantaloons | OWND)",
+          "Aditya Birla Fashion and Retail and Retail Limited (Madura Fashion )",
+          "Blackberrys",
+          "Heritage Foods",
+          "Milky Mist",
+          "Third Wave Coffee"
         ];
 
         // --- Helper Functions ---
@@ -740,15 +748,16 @@
                 updated['Payment Balance'] = invoiceAmt - paymentReceived;
               }
               
-              if (field === 'Due Date' || field === 'Payment received') {
-                const dueDate = updated['Due Date'];
+              // Aging calculation: Today - Invoice Submitted (only if payment not fully received)
+              if (field === 'Invoice Submitted' || field === 'Payment received' || field === 'Invoice Amt') {
+                const invoiceSubmitted = updated['Invoice Submitted'];
                 const paymentReceived = parseFloat(updated['Payment received']) || 0;
                 const invoiceAmt = parseFloat(updated['Invoice Amt']) || 0;
                 
-                if (dueDate && paymentReceived < invoiceAmt) {
-                  const due = new Date(dueDate);
+                if (invoiceSubmitted && paymentReceived < invoiceAmt) {
+                  const submitted = new Date(invoiceSubmitted);
                   const today = new Date();
-                  const diffTime = today - due;
+                  const diffTime = today - submitted;
                   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                   updated['Aging'] = diffDays > 0 ? diffDays : 0;
                 } else {
@@ -773,6 +782,15 @@
             availableColumns.forEach(col => {
               newEntry[col] = '';
             });
+            
+            // Auto-increment Sr No based on last entry
+            if (rawData.length > 0) {
+              const lastSrNo = Math.max(...rawData.map(row => parseInt(row['Sr No']) || 0));
+              newEntry['Sr No'] = lastSrNo + 1;
+            } else {
+              newEntry['Sr No'] = 1;
+            }
+            
             setFormData(newEntry);
             setCurrentId(null);
             setSelectedRowId(null);
@@ -1334,6 +1352,7 @@
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {dynamicFieldGroups[activeTab]?.map(col => {
                           const type = getColumnType(col);
+                          const today = new Date().toISOString().split('T')[0];
                           return (
                             <div key={col} className="flex flex-col gap-1">
                               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate" title={col}>{col}</label>
@@ -1348,6 +1367,21 @@
                                     <option key={opt} value={opt}>{opt}</option>
                                   ))}
                                 </select>
+                              ) : col === 'Client' ? (
+                                <div className="relative">
+                                  <input
+                                    list="client-options"
+                                    value={formData[col] || ''}
+                                    onChange={e => handleInputChange(col, e.target.value)}
+                                    placeholder="Select or type client name..."
+                                    className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm bg-white w-full"
+                                  />
+                                  <datalist id="client-options">
+                                    {CLIENT_OPTIONS.map(opt => (
+                                      <option key={opt} value={opt} />
+                                    ))}
+                                  </datalist>
+                                </div>
                               ) : col === 'Remarks' ? (
                                 <textarea
                                   value={formData[col] || ''}
@@ -1361,16 +1395,18 @@
                                   type="date"
                                   value={formData[col] || ''}
                                   onChange={e => handleInputChange(col, e.target.value)}
+                                  max={today}
                                   className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm"
+                                  title="Date cannot be greater than today"
                                 />
                               ) : (
                                 <input
                                   type={type === 'number' ? "number" : "text"}
                                   value={formData[col] || ''}
                                   onChange={e => handleInputChange(col, e.target.value)}
-                                  readOnly={col === 'Payment Balance' || col === 'Aging'}
+                                  readOnly={col === 'Payment Balance' || col === 'Aging' || col === 'Sr No'}
                                   className={`px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm ${
-                                    (col === 'Payment Balance' || col === 'Aging') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
+                                    (col === 'Payment Balance' || col === 'Aging' || col === 'Sr No') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white'
                                   }`}
                                 />
                               )}
